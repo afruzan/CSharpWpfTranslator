@@ -1,0 +1,17 @@
+﻿<Window x:Class="WpfTranslator.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:WpfTranslator"
+        mc:Ignorable="d"
+        Title="WPF Auto Localizer (afruzan@github.com - afruzan71@gmail.com)" Height="140" Width="708">
+    <Grid>
+        <Button x:Name="Button1" Content="Localize Project" HorizontalAlignment="Right" Margin="0,0,10,14" VerticalAlignment="Bottom" Height="42" Width="128" Click="Button_Click"/>
+        <TextBox x:Name="TextBox1" Margin="112,0,143,16" TextWrapping="Wrap" Text="D:\Projects\Vira\Repo\Video Surveillance\Projects\Client\Vira.Client" VerticalAlignment="Bottom"/>
+        <TextBlock HorizontalAlignment="Left" Margin="10,10,0,0" TextWrapping="Wrap" Text="The Tool edits xaml files and creates some ResourceDictionary at project root." VerticalAlignment="Top"/>
+        <TextBlock x:Name="TextBlock1" HorizontalAlignment="Left" Margin="10,29,0,0" TextWrapping="Wrap" Text="First make a Backup from your project." VerticalAlignment="Top" Foreground="#FFE60000"/>
+        <TextBlock HorizontalAlignment="Left" Margin="10,0,0,17" TextWrapping="Wrap" Text="Project Directory:" VerticalAlignment="Bottom"/>
+
+    </Grid>
+</Window>
