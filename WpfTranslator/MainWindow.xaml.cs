@@ -161,7 +161,7 @@ namespace WpfTranslator
             var any = false;
             Exception? exception = null;
 
-            localizedXaml = Regex.Replace(xamlFile, "=\"[^\"]*\"", m =>
+            localizedXaml = Regex.Replace(xamlFile, @"=""[^""]*""", m =>
             {
                 try
                 {
@@ -172,36 +172,54 @@ namespace WpfTranslator
                     var anyPersianLetter = m.Value?.Any(c => char.IsLetter(c) && !char.IsAscii(c)) ?? false;
                     if (anyPersianLetter)
                     {
-                        any = true;
-
                         var value = m.Value![2..^1];
 
-                        var value_en = Translate(value, "en");
-                        value_en = CultureInfo.CurrentCulture.TextInfo.ToTitleCase(value_en);
-                        var value_ar = Translate(value, "ar");
-
-                        var keyName = new string(value_en.Where(c => char.IsLetterOrDigit(c)).ToArray());
-                        var key = $"{keyName}_{context}";
-
-                        int keyIndex = 1;
-                        while (strings.TryGetValue(key, out var existing))
+                        if (Regex.IsMatch(value, @"^{\w+ .*}$")) // binding or other expressions..
                         {
-                            if (existing == value)
+                            var expression = Regex.Replace(value, @"='[^']*'", m2 =>
                             {
-                                return $"=\"{{StaticResource {key}}}\"";
-                            }
-                            else
+                                if (exception != null)
+                                {
+                                    return m2.Value;
+                                }
+                                try
+                                {
+                                    var anyPersianLetter2 = m2.Value?.Any(c => char.IsLetter(c) && !char.IsAscii(c)) ?? false;
+                                    if (anyPersianLetter2)
+                                    {
+                                        var value2 = m2.Value![2..^1];
+
+                                        any = true;
+
+                                        var key2 = TranslateAndGetKey(value2, context, strings, strings_en, strings_ar);
+
+                                        return $"={{StaticResource {key2}}}";
+                                    }
+                                    else
+                                    {
+                                        return m2.Value!;
+                                    }
+                                }
+                                catch (Exception ex)
+                                {
+                                    exception = ex;
+                                    throw;
+                                }
+                            });
+                            if (exception != null)
                             {
-                                keyIndex++;
-                                key = $"{keyName}_{keyIndex}_{context}";
+                                throw exception;
                             }
+                            return $"=\"{expression}\"";
                         }
+                        else
+                        {
+                            any = true;
 
-                        strings.Add(key, value);
-                        strings_en.Add(key, value_en);
-                        strings_ar.Add(key, value_ar);
+                            var key = TranslateAndGetKey(value, context, strings, strings_en, strings_ar);
 
-                        return $"=\"{{StaticResource {key}}}\"";
+                            return $"=\"{{StaticResource {key}}}\"";
+                        }
                     }
                     else
                     {
@@ -214,7 +232,6 @@ namespace WpfTranslator
                     throw;
                 }
             });
-
             if (exception != null)
             {
                 throw exception;
@@ -269,6 +286,36 @@ namespace WpfTranslator
             //xaml2.Close();
             //file.Close();
 
+        }
+
+        private string TranslateAndGetKey(string value, string context, Dictionary<string, string> strings, Dictionary<string, string> strings_en, Dictionary<string, string> strings_ar)
+        {
+            var value_en = Translate(value, "en");
+            value_en = CultureInfo.CurrentCulture.TextInfo.ToTitleCase(value_en);
+            var value_ar = Translate(value, "ar");
+
+            var keyName = new string(value_en.Where(c => char.IsLetterOrDigit(c)).ToArray());
+            var key = $"{keyName}_{context}";
+
+            int keyIndex = 1;
+            while (strings.TryGetValue(key, out var existing))
+            {
+                if (existing == value)
+                {
+                    return key;
+                }
+                else
+                {
+                    keyIndex++;
+                    key = $"{keyName}_{keyIndex}_{context}";
+                }
+            }
+
+            strings.Add(key, value);
+            strings_en.Add(key, value_en);
+            strings_ar.Add(key, value_ar);
+
+            return key;
         }
 
         public string Translate(string word, string toLanguage = "en", string fromLanguage = "fa")
