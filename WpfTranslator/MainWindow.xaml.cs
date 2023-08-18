@@ -62,6 +62,107 @@ namespace WpfTranslator
             }
         }
 
+
+        private async void Button2_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = MessageBox.Show("Are you sure to start? cs files will be overrited!", "Confirm", MessageBoxButton.YesNo);
+            if (dialog == MessageBoxResult.Yes)
+            {
+                Button1.IsEnabled = false;
+                var dir = TextBox1.Text;
+                try
+                {
+                    await Task.Run(() => LocalizeCsharpProject(dir, 100,
+                        (c, t) => Dispatcher.InvokeAsync(() =>
+                        {
+                            TextBlock1.Text = $"{c} of {t} Processed.";
+                        })));
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show(ex.ToString(), "Error");
+#if DEBUG
+                    throw;
+#endif
+                }
+                MessageBox.Show("Done!", "Done");
+                Button1.IsEnabled = true;
+            }
+        }
+
+
+        private async Task LocalizeCsharpProject(string dir, int threadCount, Action<int, int> onProcessed)
+        {
+            var xaml_files = Directory.EnumerateFiles(dir, "*.cs", SearchOption.AllDirectories).ToArray();
+
+            int counter = 0;
+            int total = xaml_files.Length + 3;
+            onProcessed(0, total);
+
+            string resources = "";
+            string resources_en = "";
+            string resources_ar = "";
+            var concat_lock = new object();
+
+            await Parallel.ForEachAsync(xaml_files, new ParallelOptions { MaxDegreeOfParallelism = threadCount }, async (file, stop) =>
+            {
+                //await Task.WhenAll(xaml_files.Chunk(xaml_files.Length / threadCount).Select(files => Task.Run(async () =>
+                //{
+                //    foreach (var file in files)
+                //    {
+                var xaml = await File.ReadAllTextAsync(file);
+                var context = Path.GetFileNameWithoutExtension(file);
+
+                Dictionary<string, string> strings = new();
+                Dictionary<string, string> strings_en = new();
+                Dictionary<string, string> strings_ar = new();
+
+                var localizedCSharp = new LocalizerCSharpSyntaxRewriter(
+                    text => text?.Any(c => char.IsLetter(c) && !char.IsAscii(c)) ?? false,
+                    text => TranslateAndGetKey(text, context, strings, strings_en, strings_ar),
+                    "LocalizationManager.GetString", "LocalizedDescription", new[] { "Log" })
+                .LocalizeCode(xaml);
+
+                await File.WriteAllTextAsync(file, localizedCSharp);
+
+                var res = CreateResources(context, strings);
+                var res_en = CreateResources(context, strings_en);
+                var res_ar = CreateResources(context, strings_ar);
+
+                lock (concat_lock)
+                {
+                    resources += res;
+                    resources_en += res_en;
+                    resources_ar += res_ar;
+                }
+
+                lock (concat_lock)
+                {
+                    counter++;
+                }
+                onProcessed(counter, total);
+                //    }
+                //})).ToArray());
+            });
+
+            var resource_file = CreateResourceFile(resources);
+            await File.WriteAllTextAsync(Path.Combine(dir, "CSharp_Strings.xaml"), resource_file);
+
+            onProcessed(Interlocked.Increment(ref counter), total);
+
+            var resource_en_file = CreateResourceFile(resources_en);
+            await File.WriteAllTextAsync(Path.Combine(dir, "CSharp_Strings_EN.xaml"), resource_en_file);
+
+            onProcessed(Interlocked.Increment(ref counter), total);
+
+            var resource_ar_file = CreateResourceFile(resources_ar);
+            await File.WriteAllTextAsync(Path.Combine(dir, "CSharp_Strings_AR.xaml"), resource_ar_file);
+
+            onProcessed(Interlocked.Increment(ref counter), total);
+        }
+
+
+
         private async Task LocalizeProject(string dir, int threadCount, Action<int, int> onProcessed)
         {
             var xaml_files = Directory.EnumerateFiles(dir, "*.xaml", SearchOption.AllDirectories).ToArray();
