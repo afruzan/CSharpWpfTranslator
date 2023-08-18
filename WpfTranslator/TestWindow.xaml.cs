@@ -29,54 +29,26 @@ namespace WpfTranslator
 
         private void Button_Click(object sender, RoutedEventArgs e)
         {
-            var code = @"using Vira;
-
-namespace System.ComponentModel
-{
-    public class LocalizedDescriptionAttribute : DescriptionAttribute
-    {
-        private readonly string _resourceKey;
-        public LocalizedDescriptionAttribute(string resourceKey)
-        {
-            _resourceKey = resourceKey;
-        }
-
-        public override string Description
-        {
-            get
+            try
             {
-                string displayName = LocalizationManager.GetString(""STRING!"") ?? $""ONE{_resourceKey}TWO"";
-
-                return string.IsNullOrEmpty(displayName)
-                    ? string.Format(@""[[{0}]]"", _resourceKey)
-                    : displayName;
-
-                return string.IsNullOrEmpty(displayName)
-                    ? string.Format($@""[[{0}]]"", _resourceKey)
-                    : displayName;
-
-                return string.IsNullOrEmpty(displayName)
-                    ? string.Format(@""[[{0}]]
-Line2
-"", _resourceKey)
-                    : displayName;
+                ResultTextBox.Text = new LocalizerCSharpSyntaxRewriter(s => true, s => "^" + s + "$", "I18n.Get", "I18nDescription", new[] { "Log" }).LocalizeCode(SourceTextBox.Text);
+            }
+            catch (Exception ex)
+            {
+                ResultTextBox.Text = "ERROR:\r\n" + ex.ToString();
             }
         }
-    }
 
-}
-";
-
-            var sucess = SyntaxFactory.ParseSyntaxTree(code).TryGetRoot(out var code_parsed);
-            if (sucess)
+        private void Button2_Click(object sender, RoutedEventArgs e)
+        {
+            try
             {
-                var newCode = new LocalizerCSharpSyntaxRewriter().Visit(code_parsed)?.ToFullString();
-
-                Debugger.Break();
+                ResultTextBox.Text = new LocalizerCSharpSyntaxRewriter(s => false, s => "^" + s + "$", "I18n.Get", "I18nDescription", new[] { "Log" }).LocalizeCode(SourceTextBox.Text);
             }
-
-            Debugger.Break();
-
+            catch (Exception ex)
+            {
+                ResultTextBox.Text = "ERROR:\r\n" + ex.ToString();
+            }
         }
     }
 }

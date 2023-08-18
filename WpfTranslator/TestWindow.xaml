@@ -5,9 +5,61 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:WpfTranslator"
         mc:Ignorable="d"
-        Title="TestWindow" Height="221" Width="437">
+        Title="TestWindow" Height="373" Width="579">
     <Grid>
-        <Button Content="Button" HorizontalAlignment="Right" Margin="0,0,45,24" VerticalAlignment="Bottom" Click="Button_Click"/>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+        <TextBox x:Name="SourceTextBox" Margin="10,10,10,50" TextWrapping="NoWrap" AcceptsReturn="True" AcceptsTab="True" VerticalScrollBarVisibility="Visible" HorizontalScrollBarVisibility="Visible" AutoWordSelection="True" xml:space="preserve">
+using Vira;
 
+namespace System.ComponentModel
+{
+    public class LocalizedDescriptionAttribute : DescriptionAttribute
+    {
+        private readonly string _resourceKey;
+        public LocalizedDescriptionAttribute(string resourceKey)
+        {
+            _resourceKey = resourceKey;
+        }
+
+        [MyAttribute("Dont touch me!")]
+        [Description("to translate")]
+        [Namespace1.Namespace2.Description(Attr = "to translate 2")]
+        public override string Description
+        {
+            get
+            {
+                string displayName = LocalizationManager.GetString("STRING!") ?? $"ONE{_resourceKey}TWO";
+
+                return string.IsNullOrEmpty(displayName)
+                    ? string.Format(@"[[{""0""}]]", _resourceKey)
+                    : displayName;
+
+                return string.IsNullOrEmpty(displayName)
+                    ? string.Format($@"[[{0}]]", _resourceKey)
+                    : displayName;
+
+                return string.IsNullOrEmpty(displayName)
+                    ? Namespace.Logger.Information(@"[[{0}]]
+Line2
+", _resourceKey)
+                    : displayName;
+
+                return string.IsNullOrEmpty(displayName)
+                    ? string.Format(@"[[{0}]]
+Line2
+", _resourceKey)
+                    : displayName;
+            }
+        }
+    }
+
+}
+</TextBox>
+        <TextBox x:Name="ResultTextBox" IsReadOnly="True" Grid.Column="1" Margin="10,10,10,50" TextWrapping="NoWrap" AcceptsReturn="True" AcceptsTab="True" VerticalScrollBarVisibility="Visible" HorizontalScrollBarVisibility="Visible" AutoWordSelection="True"></TextBox>
+        <Button Content="Localize1" HorizontalAlignment="Right" Margin="0,0,10,10" VerticalAlignment="Bottom" Click="Button_Click" Width="58" Height="29" Grid.Column="1"/>
+        <Button Content="Localize2" HorizontalAlignment="Right" Margin="0,0,79,10" VerticalAlignment="Bottom" Click="Button2_Click" Width="58" Height="29" Grid.Column="1"/>
     </Grid>
 </Window>
