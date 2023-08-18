@@ -88,7 +88,7 @@ namespace WpfTranslator
                 Dictionary<string, string> strings_en = new();
                 Dictionary<string, string> strings_ar = new();
 
-                if (LocalizePersianTexts(xaml, context, strings, strings_en, strings_ar, out var localizedXaml))
+                if (new XamlLocalizer(text => TranslateAndGetKey(text, context, strings, strings_en, strings_ar)).LocalizeXamlPersianTexts(xaml, out var localizedXaml))
                 {
                     await File.WriteAllTextAsync(file, localizedXaml);
 
@@ -130,7 +130,6 @@ namespace WpfTranslator
         }
 
 
-
         private string CreateResourceFile(string content)
         {
             return @$"
@@ -155,144 +154,11 @@ namespace WpfTranslator
 ";
         }
 
-
-        private bool LocalizePersianTexts(string xamlFile, string context, Dictionary<string, string> strings, Dictionary<string, string> strings_en, Dictionary<string, string> strings_ar, out string localizedXaml)
-        {
-            var any = false;
-            Exception? exception = null;
-
-            localizedXaml = Regex.Replace(xamlFile, @"=""[^""]*""", m =>
-            {
-                try
-                {
-                    if (exception != null)
-                    {
-                        return m.Value;
-                    }
-                    var anyPersianLetter = m.Value?.Any(c => char.IsLetter(c) && !char.IsAscii(c)) ?? false;
-                    if (anyPersianLetter)
-                    {
-                        var value = m.Value![2..^1];
-
-                        if (Regex.IsMatch(value, @"^{\w+ .*}$")) // binding or other expressions..
-                        {
-                            var expression = Regex.Replace(value, @"='[^']*'", m2 =>
-                            {
-                                if (exception != null)
-                                {
-                                    return m2.Value;
-                                }
-                                try
-                                {
-                                    var anyPersianLetter2 = m2.Value?.Any(c => char.IsLetter(c) && !char.IsAscii(c)) ?? false;
-                                    if (anyPersianLetter2)
-                                    {
-                                        var value2 = m2.Value![2..^1];
-
-                                        any = true;
-
-                                        var key2 = TranslateAndGetKey(value2, context, strings, strings_en, strings_ar);
-
-                                        return $"={{StaticResource {key2}}}";
-                                    }
-                                    else
-                                    {
-                                        return m2.Value!;
-                                    }
-                                }
-                                catch (Exception ex)
-                                {
-                                    exception = ex;
-                                    throw;
-                                }
-                            });
-                            if (exception != null)
-                            {
-                                throw exception;
-                            }
-                            return $"=\"{expression}\"";
-                        }
-                        else
-                        {
-                            any = true;
-
-                            var key = TranslateAndGetKey(value, context, strings, strings_en, strings_ar);
-
-                            return $"=\"{{StaticResource {key}}}\"";
-                        }
-                    }
-                    else
-                    {
-                        return m.Value!;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    exception = ex;
-                    throw;
-                }
-            });
-            if (exception != null)
-            {
-                throw exception;
-            }
-
-            return any;
-
-            //var xaml = new XamlXmlReader(openFileDialog.FileName);
-            //var file = new FileStream(saveFileDialog.FileName, FileMode.Create);
-            //var xaml2 = new XamlXmlWriter(file, xaml.SchemaContext);
-
-            //Type? propType = null;
-            //while (xaml.Read())
-            //{
-            //    switch (xaml.NodeType)
-            //    {
-            //        case XamlNodeType.StartObject:
-            //            xaml2.WriteStartObject(xaml.Type);
-            //            break;
-            //        case XamlNodeType.GetObject:
-            //            xaml2.WriteGetObject();
-            //            break;
-            //        case XamlNodeType.EndObject:
-            //            xaml2.WriteEndObject();
-            //            break;
-            //        case XamlNodeType.StartMember:
-            //            xaml2.WriteStartMember(xaml.Member);
-            //            propType = (xaml.Member.UnderlyingMember as PropertyInfo)?.PropertyType;
-            //            break;
-            //        case XamlNodeType.EndMember:
-            //            xaml2.WriteEndMember();
-            //            break;
-            //        case XamlNodeType.Value:
-            //            var lettersCount = xaml.Value?.ToString()?.Count(c => char.IsLetter(c)) ?? -1;
-            //            if (propType == typeof(string) && lettersCount > 5)
-            //            {
-            //                xaml2.WriteValue(xaml.Value);
-            //            }
-            //            else
-            //            {
-            //                xaml2.WriteValue(xaml.Value);
-            //            }
-            //            break;
-            //        case XamlNodeType.NamespaceDeclaration:
-            //            xaml2.WriteNamespace(xaml.Namespace);
-            //            break;
-            //        default:
-            //            throw new NotSupportedException();
-            //    }
-            //}
-
-            //xaml2.Close();
-            //file.Close();
-
-        }
-
         private string TranslateAndGetKey(string value, string context, Dictionary<string, string> strings, Dictionary<string, string> strings_en, Dictionary<string, string> strings_ar)
         {
-            var value_en = Translate(value, "en");
+            var value_en = Translator.Translate(value, "en");
             value_en = CultureInfo.CurrentCulture.TextInfo.ToTitleCase(value_en);
-            var value_ar = Translate(value, "ar");
+            var value_ar = Translator.Translate(value, "ar");
 
             var keyName = new string(value_en.Where(c => char.IsLetterOrDigit(c)).ToArray());
             var key = $"{keyName}_{context}";
@@ -316,40 +182,6 @@ namespace WpfTranslator
             strings_ar.Add(key, value_ar);
 
             return key;
-        }
-
-        public string Translate(string word, string toLanguage = "en", string fromLanguage = "fa")
-        {
-            return TranslateAsync(word, toLanguage, fromLanguage).Result;
-        }
-
-        private readonly HttpClient httpClient = new() { Timeout = TimeSpan.FromSeconds(30) };
-
-        public async Task<string> TranslateAsync(string word, string toLanguage = "en", string fromLanguage = "fa")
-        {
-            var url = $"https://translate.googleapis.com/translate_a/single?client=gtx&sl={fromLanguage}&tl={toLanguage}&dt=t&q={HttpUtility.UrlEncode(word)}";
-
-            int retry = 0;
-            while (true)
-            {
-                retry++;
-                try
-                {
-                    var responce = await httpClient.GetAsync(url);
-                    var result = await responce.EnsureSuccessStatusCode().Content.ReadAsStringAsync();
-
-                    result = result.Substring(4, result.IndexOf("\"", 4, StringComparison.Ordinal) - 4);
-                    return result;
-                }
-                catch (Exception ex)
-                {
-                    if (retry > 3)
-                    {
-                        throw new Exception("Translation request failed.", ex);
-                    }
-                    await Task.Delay(1000);
-                }
-            }
         }
 
     }

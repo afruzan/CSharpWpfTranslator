@@ -8,7 +8,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace CSharpTranslator
+namespace WpfTranslator
 {
     public class LocalizerCSharpSyntaxRewriter : CSharpSyntaxRewriter
     {
