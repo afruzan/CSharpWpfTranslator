@@ -27,6 +27,8 @@ namespace WpfTranslator
             this.methodsToSkip = methodsToSkip;
         }
 
+        public bool AnyRewrite { get; private set; }
+
         public string LocalizeCode(string code)
         {
             if (string.IsNullOrWhiteSpace(code))
@@ -51,6 +53,8 @@ namespace WpfTranslator
 
         private SyntaxNode CreateLocalizerGetStringInvocationExpression(string valueText)
         {
+            AnyRewrite = true;
+
             var keyText = translatorGetKeyFunc(valueText);
 
             var arg0 = SyntaxFactory.Argument(
@@ -65,6 +69,8 @@ namespace WpfTranslator
 
         private SyntaxNode CreateLocalizedDescriptionAtributeExpression(string valueText)
         {
+            AnyRewrite = true;
+
             var keyText = translatorGetKeyFunc(valueText);
 
             var arg0 = SyntaxFactory.AttributeArgument(

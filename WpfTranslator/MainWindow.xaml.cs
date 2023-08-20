@@ -41,6 +41,7 @@ namespace WpfTranslator
             if (dialog == MessageBoxResult.Yes)
             {
                 Button1.IsEnabled = false;
+                Button2.IsEnabled = false;
                 var dir = TextBox1.Text;
                 try
                 {
@@ -59,6 +60,7 @@ namespace WpfTranslator
                 }
                 MessageBox.Show("Done!", "Done");
                 Button1.IsEnabled = true;
+                Button2.IsEnabled = true;
             }
         }
 
@@ -69,6 +71,7 @@ namespace WpfTranslator
             if (dialog == MessageBoxResult.Yes)
             {
                 Button1.IsEnabled = false;
+                Button2.IsEnabled = false;
                 var dir = TextBox1.Text;
                 try
                 {
@@ -87,6 +90,7 @@ namespace WpfTranslator
                 }
                 MessageBox.Show("Done!", "Done");
                 Button1.IsEnabled = true;
+                Button2.IsEnabled = true;
             }
         }
 
@@ -110,30 +114,34 @@ namespace WpfTranslator
                 //{
                 //    foreach (var file in files)
                 //    {
-                var xaml = await File.ReadAllTextAsync(file);
+                var csharp = await File.ReadAllTextAsync(file);
                 var context = Path.GetFileNameWithoutExtension(file);
 
                 Dictionary<string, string> strings = new();
                 Dictionary<string, string> strings_en = new();
                 Dictionary<string, string> strings_ar = new();
 
-                var localizedCSharp = new LocalizerCSharpSyntaxRewriter(
+                var rewriter = new LocalizerCSharpSyntaxRewriter(
                     text => text?.Any(c => char.IsLetter(c) && !char.IsAscii(c)) ?? false,
                     text => TranslateAndGetKey(text, context, strings, strings_en, strings_ar),
-                    "LocalizationManager.GetString", "LocalizedDescription", new[] { "Log" })
-                .LocalizeCode(xaml);
+                    "LocalizationManager.GetString", "LocalizedDescription", new[] { "Log" });
 
-                await File.WriteAllTextAsync(file, localizedCSharp);
+                var localizedCSharp = rewriter.LocalizeCode(csharp);
 
-                var res = CreateResources(context, strings);
-                var res_en = CreateResources(context, strings_en);
-                var res_ar = CreateResources(context, strings_ar);
-
-                lock (concat_lock)
+                if (rewriter.AnyRewrite)
                 {
-                    resources += res;
-                    resources_en += res_en;
-                    resources_ar += res_ar;
+                    await File.WriteAllTextAsync(file, localizedCSharp);
+
+                    var res = CreateResources(context, strings);
+                    var res_en = CreateResources(context, strings_en);
+                    var res_ar = CreateResources(context, strings_ar);
+
+                    lock (concat_lock)
+                    {
+                        resources += res;
+                        resources_en += res_en;
+                        resources_ar += res_ar;
+                    }
                 }
 
                 lock (concat_lock)
@@ -242,8 +250,13 @@ namespace WpfTranslator
 ";
         }
 
-        private string CreateResources(string header, Dictionary<string, string> strings)
+        private string? CreateResources(string header, Dictionary<string, string> strings)
         {
+            if (strings.Count == 0)
+            {
+                return null;
+            }
+
             var xaml = string.Join("\r\n", strings.Select(item =>
             @$"    <system:String x:Key=""{item.Key}"">{item.Value}</system:String>"));
 
@@ -258,10 +271,15 @@ namespace WpfTranslator
         private string TranslateAndGetKey(string value, string context, Dictionary<string, string> strings, Dictionary<string, string> strings_en, Dictionary<string, string> strings_ar)
         {
             var value_en = Translator.Translate(value, "en");
-            value_en = CultureInfo.CurrentCulture.TextInfo.ToTitleCase(value_en);
             var value_ar = Translator.Translate(value, "ar");
 
-            var keyName = new string(value_en.Where(c => char.IsLetterOrDigit(c)).ToArray());
+            var value_en_TileCase = CultureInfo.CurrentCulture.TextInfo.ToTitleCase(value_en);
+            if (GetWordCount(value_en) <= 4)
+            {
+                value_en = value_en_TileCase;
+            }
+
+            var keyName = new string(value_en_TileCase.Where(c => char.IsLetterOrDigit(c)).ToArray());
             var key = $"{keyName}_{context}";
 
             int keyIndex = 1;
@@ -284,6 +302,32 @@ namespace WpfTranslator
 
             return key;
         }
+
+        public static int GetWordCount(string text)
+        {
+            int wordCount = 0, index = 0;
+
+            // skip whitespace until first word
+            while (index < text.Length && !char.IsLetter(text[index]))
+                index++;
+
+            while (index < text.Length)
+            {
+                // check if current char is part of a word
+                while (index < text.Length && char.IsLetter(text[index]))
+                    index++;
+
+                wordCount++;
+
+                // skip whitespace until next word
+                while (index < text.Length && !char.IsLetter(text[index]))
+                    index++;
+            }
+
+            return wordCount;
+        }
+
+
 
     }
 }
